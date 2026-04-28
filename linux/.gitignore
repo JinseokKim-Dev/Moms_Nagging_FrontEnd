@@ -1,0 +1,21 @@
+# 플러터 빌드 결과물 (용량이 크고 매번 바뀜)
+/build/
+
+# 플러터 내부 도구 파일
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+
+# VS Code 개인 설정 (팀원과 공유할 필요 없음)
+.vscode/
+
+# 안드로이드 및 iOS 특정 빌드 파일
+.gradle/
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+node_modules/
+
+#api 업로드 방지
+.env
