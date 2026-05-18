@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'signup_service.dart';
 import 'signup_validator.dart';
 
-// 회원가입 화면도 입력값과 로딩 상태가 바뀌므로 StatefulWidget으로 작성한다.
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -11,26 +10,23 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  // 입력창별 컨트롤러
   final TextEditingController nameController = TextEditingController();
   final TextEditingController nicknameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
-
-  // 회원가입 요청 전용 서비스
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
   final SignUpService signUpService = SignUpService();
 
-  // 비밀번호 / 비밀번호 확인 표시 여부
   bool isPasswordHidden = true;
   bool isConfirmPasswordHidden = true;
+  String? passwordErrorText;
 
   // 회원가입 요청 진행 중 여부
   bool isLoading = false;
 
   @override
   void dispose() {
-    // 사용한 컨트롤러와 서비스 정리
     nameController.dispose();
     nicknameController.dispose();
     emailController.dispose();
@@ -40,7 +36,6 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
-  // 하단 알림 메시지 helper
   void showSnackBar(String message, {Color backgroundColor = Colors.red}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -60,7 +55,6 @@ class _SignUpPageState extends State<SignUpPage> {
     final password = passwordController.text.trim();
     final confirmPassword = confirmPasswordController.text.trim();
 
-    // 서버 요청 전 유효성 검사
     final validationError = SignUpValidator.validate(
       name: name,
       nickname: nickname,
@@ -70,6 +64,16 @@ class _SignUpPageState extends State<SignUpPage> {
     );
 
     if (validationError != null) {
+      setState(() {
+        passwordErrorText =
+            validationError == SignUpValidationError.invalidPassword
+            ? SignUpValidator.passwordErrorText(
+                password,
+                showEmptyMessage: true,
+              )
+            : null;
+      });
+
       showSnackBar(
         SignUpValidator.message(validationError),
         backgroundColor: validationError == SignUpValidationError.emptyFields
@@ -123,7 +127,6 @@ class _SignUpPageState extends State<SignUpPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-
         // AppBar는 상단 제목 영역
         title: const Text('회원가입'),
         centerTitle: true,
@@ -131,7 +134,6 @@ class _SignUpPageState extends State<SignUpPage> {
         elevation: 0,
       ),
       body: SafeArea(
-
         // SingleChildScrollView를 써서 키보드가 올라오거나 작은 화면에서도 안 잘리게 한다.
         child: Center(
           child: SingleChildScrollView(
@@ -234,6 +236,19 @@ class _SignUpPageState extends State<SignUpPage> {
                     TextField(
                       controller: passwordController,
                       obscureText: isPasswordHidden,
+                      onChanged: (value) {
+                        final nextError = SignUpValidator.passwordErrorText(
+                          value,
+                        );
+
+                        if (passwordErrorText == nextError) {
+                          return;
+                        }
+
+                        setState(() {
+                          passwordErrorText = nextError;
+                        });
+                      },
                       decoration: InputDecoration(
                         hintText: '비밀번호',
                         prefixIcon: const Icon(Icons.lock_outline),
@@ -250,11 +265,46 @@ class _SignUpPageState extends State<SignUpPage> {
                                 : Icons.visibility,
                           ),
                         ),
+                        helperText: SignUpValidator.passwordGuideText,
+                        helperMaxLines: 2,
+                        helperStyle: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                        errorText: passwordErrorText,
+                        errorMaxLines: 2,
                         filled: true,
                         fillColor: const Color(0xFFF3F4F6),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: Colors.transparent,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: Colors.deepPurple,
+                            width: 1.4,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 1.4,
+                          ),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 1.6,
+                          ),
                         ),
                       ),
                     ),
@@ -294,7 +344,6 @@ class _SignUpPageState extends State<SignUpPage> {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-
                         // 요청 중에는 버튼 비활성화
                         onPressed: isLoading ? null : signUp,
                         style: ElevatedButton.styleFrom(
@@ -320,7 +369,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              ),
+                      ),
                     ),
                     const SizedBox(height: 16),
 

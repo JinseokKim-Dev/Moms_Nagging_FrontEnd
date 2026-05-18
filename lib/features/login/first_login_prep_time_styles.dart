@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 
-// 이 파일은 준비 시간 화면의 "모양"을 담당한다.
-// 쉽게 말해 색상, 여백, 글자 크기, 테두리 모양 같은 시각 요소를 모아둔 곳이다.
-//
-// 이런 값을 화면 파일 안에 직접 적으면:
-// - build 메서드가 길어지고
-// - 같은 스타일을 여러 군데서 반복하게 되고
-// - 나중에 디자인 수정할 때 찾기 어려워진다.
-//
-// 그래서 스타일 관련 값만 별도 클래스로 모아서 재사용한다.
+/*
+==================================
+**FirstLoginPrepTimeStyles Class**
+==================================
+*/
+// static const Color abc 이게 -> static const int a 이런 느낌
 class FirstLoginPrepTimeStyles {
   // 화면 전체 배경색
   static const Color pageBackgroundColor = Color(0xFF080808);

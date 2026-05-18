@@ -1,95 +1,205 @@
 import 'package:flutter/material.dart';
 
-// HomePage는 내부 상태를 직접 바꾸지 않는 단순 결과 화면이라
-// StatefulWidget이 아니라 StatelessWidget으로 만들었다.
-class HomePage extends StatelessWidget {
+import 'alarm/alarm_logic.dart';
+import 'alarm/alarm_storage.dart';
+import 'core/auth/auth_token_storage.dart';
+import 'home/home_logic.dart';
+import 'home/home_tabs.dart';
+import 'home/home_widgets.dart';
+import 'login/login.dart';
+
+class HomePage extends StatefulWidget {
   const HomePage({super.key, this.prepTimeMinutes});
 
-  // 사용자가 앞 화면에서 설정한 준비 시간(분 단위)
-  // null이면 아직 준비 시간이 전달되지 않은 경우다.
   final int? prepTimeMinutes;
 
-  // 화면에 보여줄 때는 "65분"보다 "1시간 5분"이 더 읽기 쉬우므로
-  // 분 단위 값을 시간/분 형식 문자열로 변환해 주는 helper 메서드다.
-  String _formatPrepTime(int minutes) {
-    // ~/ 는 Dart의 정수 나눗셈이다.
-    final hours = minutes ~/ 60;
-    final remainingMinutes = minutes % 60;
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
 
-    // 1시간 5분 같은 형태
-    if (hours > 0 && remainingMinutes > 0) {
-      return '$hours시간 $remainingMinutes분';
+class _HomePageState extends State<HomePage> {
+  final AlarmStorage _alarmStorage = AlarmStorage();
+  final AuthTokenStorage _tokenStorage = AuthTokenStorage();
+
+  int _currentIndex = 0;
+  List<AlarmRoutine> _alarms = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAlarms();
+  }
+
+  void _showComingSoon(String label) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label 기능은 다음 단계에서 연결할 수 있어요.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _loadAlarms() async {
+    final storedAlarms = await _alarmStorage.readAlarms();
+    final initialPrepTimeMinutes = widget.prepTimeMinutes ?? 35;
+    final alarms =
+        storedAlarms ??
+        [
+          AlarmScheduleCalculator.buildDefault(
+            prepTimeMinutes: initialPrepTimeMinutes,
+          ),
+        ];
+
+    if (storedAlarms == null) {
+      await _alarmStorage.saveAlarms(alarms);
     }
 
-    // 2시간 같이 딱 떨어지는 형태
-    if (hours > 0) {
-      return '$hours시간';
+    if (!mounted) {
+      return;
     }
 
-    // 60분 미만은 그대로 분만 보여준다.
-    return '$minutes분';
+    setState(() => _alarms = alarms);
+  }
+
+  Future<void> _saveAlarms(
+    List<AlarmRoutine> alarms, {
+    String? snackBarMessage,
+  }) async {
+    setState(() => _alarms = alarms);
+    await _alarmStorage.saveAlarms(alarms);
+
+    if (!mounted || snackBarMessage == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(snackBarMessage),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _upsertAlarm(AlarmRoutine alarm) async {
+    final nextAlarms = [..._alarms];
+    final existingIndex = nextAlarms.indexWhere((item) => item.id == alarm.id);
+
+    if (existingIndex == -1) {
+      nextAlarms.add(alarm);
+      await _saveAlarms(nextAlarms, snackBarMessage: '새 알람을 저장했어요.');
+      return;
+    }
+
+    nextAlarms[existingIndex] = alarm;
+    await _saveAlarms(
+      nextAlarms,
+      snackBarMessage: '"${alarm.title}" 알람을 업데이트했어요.',
+    );
+  }
+
+  Future<void> _deleteAlarm(AlarmRoutine alarm) async {
+    final nextAlarms = _alarms
+        .where((item) => item.id != alarm.id)
+        .toList(growable: false);
+
+    await _saveAlarms(
+      nextAlarms,
+      snackBarMessage: '"${alarm.title}" 알람을 삭제했어요.',
+    );
+  }
+
+  Future<void> _logout() async {
+    await _tokenStorage.clearTokens();
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final fallbackPrepTimeMinutes = widget.prepTimeMinutes ?? 35;
+    final nextOccurrence = AlarmScheduleCalculator.findNextOccurrence(
+      alarms: _alarms,
+      now: now,
+    );
+    final hasActiveAlarm = nextOccurrence != null;
+    final prepTimeMinutes =
+        nextOccurrence?.alarm.prepTimeMinutes ?? fallbackPrepTimeMinutes;
+    final bufferMinutes = nextOccurrence?.alarm.bufferMinutes ?? 20;
+    final departureTime =
+        nextOccurrence?.departureTime ??
+        HomeScheduleCalculator.buildNextDepartureTime(now);
+    final alarmTime =
+        nextOccurrence?.triggerTime ??
+        HomeScheduleCalculator.buildAlarmTime(
+          departureTime: departureTime,
+          prepTimeMinutes: prepTimeMinutes,
+          bufferMinutes: bufferMinutes,
+        );
+    final nextAlarmLabel = hasActiveAlarm
+        ? HomeScheduleCalculator.buildNextAlarmLabel(
+            now: now,
+            alarmTime: alarmTime,
+          )
+        : '활성화된 알람이 없어요. 알람 탭에서 다시 켜거나 새로 추가해보세요.';
+    final nextAlarmTitle = hasActiveAlarm
+        ? '${nextOccurrence.alarm.title} · ${AlarmScheduleCalculator.buildRepeatLabel(nextOccurrence.alarm.weekdays)}'
+        : _alarms.isEmpty
+        ? '아직 등록된 알람이 없어요'
+        : '모든 알람이 비활성화되어 있어요';
+
     return Scaffold(
-      // Scaffold는 기본적인 화면 뼈대(appBar, body 등)를 제공한다.
-      backgroundColor: const Color(0xFFF5F6FA),
-      appBar: AppBar(
-        title: const Text('Home'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+      backgroundColor: const Color(0xFFF7F3EC),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          HomeTab(
+            now: now,
+            prepTimeMinutes: prepTimeMinutes,
+            departureTime: departureTime,
+            alarmTime: alarmTime,
+            nextAlarmLabel: nextAlarmLabel,
+            nextAlarmTitle: nextAlarmTitle,
+            hasActiveAlarm: hasActiveAlarm,
+            bufferMinutes: bufferMinutes,
+            alarms: _alarms,
+            originalPrepTimeMinutes: widget.prepTimeMinutes,
+            onOpenAlarmTab: () => setState(() => _currentIndex = 1),
+            onToggleAlarm: (alarm) {
+              _upsertAlarm(alarm);
+            },
+            onOpenSettingsTab: () => setState(() => _currentIndex = 2),
+            onComingSoon: _showComingSoon,
+          ),
+          AlarmTab(
+            alarms: _alarms,
+            nextOccurrence: nextOccurrence,
+            defaultPrepTimeMinutes: fallbackPrepTimeMinutes,
+            onSaveAlarm: (alarm) {
+              _upsertAlarm(alarm);
+            },
+            onDeleteAlarm: (alarm) {
+              _deleteAlarm(alarm);
+            },
+            onComingSoon: _showComingSoon,
+          ),
+          SettingsTab(
+            prepTimeMinutes: prepTimeMinutes,
+            onLogout: _logout,
+            onComingSoon: _showComingSoon,
+          ),
+        ],
       ),
-
-      // Center는 자식 위젯을 화면 가운데에 배치한다.
-      body: Center(
-        child: Container(
-          margin: const EdgeInsets.all(24),
-          padding: const EdgeInsets.all(24),
-
-          // BoxDecoration으로 카드 같은 흰색 박스를 만든다.
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: const [
-              BoxShadow(
-                color: Color.fromRGBO(0, 0, 0, 0.08),
-                blurRadius: 20,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-
-          // Column은 아이콘, 텍스트들을 세로로 쌓아 준다.
-          child: Column(
-
-            // 세로로 필요한 만큼만 차지해서 카드 높이가 과도하게 커지지 않게 한다.
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.check_circle_outline_rounded,
-                size: 72,
-                color: Colors.green,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '로그인되었습니다.',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                // 삼항 연산자(condition ? a : b)로
-                // 준비 시간이 있는 경우와 없는 경우 문구를 나눠서 보여준다.
-                prepTimeMinutes == null
-                    ? '이제 홈 화면을 연결하면 됩니다.'
-                    : '설정한 준비 시간은 ${_formatPrepTime(prepTimeMinutes!)}입니다.',
-                style: const TextStyle(fontSize: 16, color: Colors.black54),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
+      bottomNavigationBar: HomeBottomBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
       ),
     );
   }

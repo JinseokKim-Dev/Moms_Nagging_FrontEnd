@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
-import './login/first_login_prep_time_page.dart';
+import 'core/auth/auth_token_storage.dart';
+import './home.dart';
 import './login/login.dart';
 
-// main 함수는 Flutter 앱의 시작점(entry point)이다.
-// runApp이 실제로 화면에 표시할 최상위 위젯을 실행한다.
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
-}
+} // 앱 시작 부분
 
-// MyApp은 앱 전체 공통 설정을 담는 루트 위젯이다.
-// 보통 MaterialApp, Theme, 첫 화면(home) 같은 설정이 여기 들어간다.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -29,8 +27,40 @@ class MyApp extends StatelessWidget {
       ),
 
       // 앱이 처음 열릴 때 보여줄 첫 화면
-      // 지금은 준비 시간 설정 페이지로 연결되어 있다.
-      home: const FirstLoginPrepTimePage(),
+      home: AuthGate(tokenStorage: AuthTokenStorage()),
     );
   }
 }
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key, required this.tokenStorage});
+
+  final AuthTokenStorage tokenStorage;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: tokenStorage.hasActiveSession(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.data == true) {
+          return const HomePage();
+        }
+
+        return const LoginPage();
+      },
+    );
+  }
+}
+
+//API 테스트 실행 방법 -> 아래 명령어 터미널로 실행
+//flutter run -d chrome \--dart-define=API_BASE_URL=http://127.0.0.1:3658/m1/1278134-1276435-default
+
+//회원 가입 후 첫 로그인 페이지를 확인하고 싶으면 아래 import 추가 하고
+
+//import './login/first_login_prep_time_page.dart';

@@ -1,18 +1,17 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/network/api_constants.dart';
 
 // 회원가입 API 요청을 담당하는 서비스 클래스
 class SignUpService {
   // 외부에서 client를 주입할 수 있게 해서 테스트와 재사용성을 높인다.
   SignUpService({http.Client? client}) : _client = client ?? http.Client();
-
   // 네트워크 요청을 실제로 보내는 객체
   final http.Client _client;
 
   // 회원가입 API 주소
-  static final Uri _signUpUri = Uri.parse(
-    'http://localhost:8080/api/v1/member/join',
-  );
+  static final Uri _signUpUri = ApiConstants.uri(ApiConstants.signUp);
 
   // 회원가입 요청 함수
   Future<SignUpResult> signUp({
@@ -25,10 +24,7 @@ class SignUpService {
       // 서버에서 요구하는 형태에 맞게 JSON body를 만든다.
       final response = await _client.post(
         _signUpUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Origin': 'http://localhost:3000',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
           'password': password,
@@ -56,9 +52,17 @@ class SignUpService {
         '서버 오류가 발생했습니다. (${response.statusCode})',
         reasonPhrase: response.reasonPhrase,
       );
+    } on TimeoutException catch (error) {
+      return SignUpResult.failure(
+        '네트워크 오류가 발생했습니다. 서버 주소를 확인해주세요. (${ApiConstants.baseUrl})',
+        error: error,
+      );
     } catch (error) {
       // 연결 실패나 파싱 문제 등 예외 발생 시
-      return SignUpResult.failure('네트워크 오류가 발생했습니다.', error: error);
+      return SignUpResult.failure(
+        '네트워크 오류가 발생했습니다. 서버 주소를 확인해주세요. (${ApiConstants.baseUrl})',
+        error: error,
+      );
     }
   }
 

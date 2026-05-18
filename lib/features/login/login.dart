@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'first_login_prep_time_page.dart';
-import '../home.dart';
 import 'login_service.dart';
-import 'login_validator.dart';
+import 'login_validator_definition.dart';
+import '../home.dart';
 import '../signup/signup.dart';
 
-// 로그인 화면은 입력값, 로딩 상태, 비밀번호 표시 여부가 계속 바뀌므로
-// StatefulWidget으로 만드는 것이 자연스럽다.
+/*
+======================
+**로그인 페이지 Class**
+======================
+*/
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -14,31 +17,28 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
+/*
+======================
+**   로그인 Class   **
+======================
+*/
 class _LoginPageState extends State<LoginPage> {
-  // 각 입력창과 연결된 컨트롤러
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-
-  // 서버 통신 전용 서비스 객체
   final LoginService loginService = LoginService();
-
-  // 비밀번호 글자를 가릴지 여부
   bool isPasswordHidden = true;
-
-  // 로그인 요청 중인지 여부
   bool isLoading = false;
+  // 이메일, 비밀번호 입력할 때 받아주는 역할을 하는 컨테이너 설정
+  // 위젯에서 사용할 bool 변수이고 패스워드를 가릴지 말지와 로딩 표시 할지 말지 설정
 
   @override
   void dispose() {
-    // 화면이 사라질 때 controller / service 자원을 정리한다.
     emailController.dispose();
     passwordController.dispose();
     loginService.dispose();
     super.dispose();
-  }
+  } // 위젯이 새로고침이나 다른 페이지 이동으로 인해 사라질 때 위젯 내의 값들 전부 반환
 
-  // Snackbar는 화면 하단에 잠깐 뜨는 메시지다.
-  // 같은 형태를 여러 군데서 쓰므로 helper 메서드로 분리해 두었다.
   void showSnackBar(String message, {Color backgroundColor = Colors.red}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -48,20 +48,23 @@ class _LoginPageState extends State<LoginPage> {
         duration: const Duration(seconds: 2),
       ),
     );
-  }
+  } // 스낵바에 대한 설정이고 스낵바는 아래 하단에 나오는 바
 
-  // 실제 로그인 처리 흐름
+  /*
+    =======================================
+    **        Future<void> login()       **
+    **login_validator_definition 코드 참고**
+    **          59 ~ 75 라인              **
+    =======================================
+    */
   Future<void> login() async {
-    // trim()은 앞뒤 공백 제거
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
-
-    // 서버 요청 전에 로컬에서 먼저 유효성 검사
     final validationError = LoginValidator.validate(
       email: email,
       password: password,
     );
-
+    // 벨리데이션 에러 통과 못한다면 스낵바 띄워서 경고 표시
     if (validationError != null) {
       showSnackBar(
         LoginValidator.message(validationError),
@@ -71,32 +74,40 @@ class _LoginPageState extends State<LoginPage> {
       );
       return;
     }
-
-    // setState를 호출하면 버튼이 비활성화되고 로딩 UI가 다시 그려진다.
+    /*
+    =======================================
+    **        Future<void> login()       **
+    **login_validator_definition 코드 참고**
+    =======================================
+    */
+    /*
+    ===================================
+    **    login_service 코드 참고    **
+    ===================================
+    */
     setState(() => isLoading = true);
-
     try {
-      // await는 Future가 끝날 때까지 기다린다.
-      final result = await loginService.login(email: email, password: password);
-
-      // 비동기 작업 중 화면이 사라졌을 수 있으므로 mounted 체크를 한다.
+      final result = await loginService.login(
+        email: email,
+        password: password,
+      ); // 로그인 서비스 호출하고 결과 받아올 때 까지 대기
       if (!mounted) return;
-
       if (result.isSuccess) {
-        debugPrint('로그인 성공: ${result.data}');
+        debugPrint('로그인 성공');
+        debugPrint('GrantType: ${result.grantType}');
+        debugPrint('AccessTokenExpiresIn: ${result.accessTokenExpiresIn}');
+
         showSnackBar(result.message, backgroundColor: Colors.green);
 
-        // 서버 응답을 보고 첫 로그인인지 판단해서
-        // 준비 시간 설정 화면 또는 홈 화면으로 분기한다.
-        final nextPage = _shouldShowPrepTimeSetup(result.data)
+        final nextPage = result.isFirstLogin
             ? const FirstLoginPrepTimePage()
             : const HomePage();
 
-        // 로그인 화면을 다음 화면으로 교체
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => nextPage),
         );
+
         return;
       }
 
@@ -110,14 +121,12 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('Exception: ${result.error}');
       }
     } finally {
-      // try 안에서 성공/실패/예외가 어떻게 끝나든 마지막에 실행된다.
       if (mounted) {
         setState(() => isLoading = false);
       }
     }
-  }
+  } // 로그인 버튼을 눌렀을 때 실행되는 함수, 입력값 검증, 로그인 요청, 결과 처리, 다음 화면 이동 등을 담당
 
-  // 아직 기능이 없는 버튼이므로 안내 메시지만 띄운다.
   void findId() {
     showSnackBar('이메일 찾기 페이지로 이동...', backgroundColor: Colors.grey);
   }
@@ -126,7 +135,6 @@ class _LoginPageState extends State<LoginPage> {
     showSnackBar('PW 찾기 페이지로 이동...', backgroundColor: Colors.grey);
   }
 
-  // 회원가입 화면으로 이동
   void signUp() {
     Navigator.push(
       context,
@@ -134,48 +142,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  // 서버에서 내려준 로그인 결과를 보고
-  // 준비 시간 설정을 먼저 해야 하는지 판단하는 helper다.
-  //
-  // dynamic / Map / bool / String 등 여러 타입이 섞여 들어올 수 있어서
-  // 타입을 하나씩 확인하면서 안전하게 처리한다.
-  bool _shouldShowPrepTimeSetup(dynamic data) {
-    if (data is! Map) return false;
-
-    final map = Map<String, dynamic>.from(data);
-    final firstLoginValue = map['firstLogin'] ?? map['isFirstLogin'];
-
-    // 서버가 bool로 내려준 경우
-    if (firstLoginValue is bool) {
-      return firstLoginValue;
-    }
-
-    // 서버가 문자열 "true"/"false"로 내려준 경우도 대응
-    if (firstLoginValue is String) {
-      final normalized = firstLoginValue.toLowerCase();
-      if (normalized == 'true') return true;
-      if (normalized == 'false') return false;
-    }
-
-    final prepTimeValue =
-        map['prepTime'] ?? map['preparationTime'] ?? map['readyTime'];
-
-    if (prepTimeValue == null) return false;
-
-    // 준비 시간이 0 이하라면 아직 설정하지 않은 것으로 판단
-    if (prepTimeValue is num) {
-      return prepTimeValue <= 0;
-    }
-
-    // 빈 문자열도 아직 설정 안 한 것으로 본다.
-    if (prepTimeValue is String) {
-      return prepTimeValue.trim().isEmpty;
-    }
-
-    return false;
-  }
-
-  @override
+  @override // 신경 안써도 됨 그냥 위젯들
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
