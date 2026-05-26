@@ -8,11 +8,13 @@ class MomMoodCard extends StatelessWidget {
     required this.mood,
     required this.prepTimeMinutes,
     required this.departureTime,
+    required this.targetLabel,
   });
 
   final MomMoodData mood;
   final int prepTimeMinutes;
   final DateTime departureTime;
+  final String targetLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +120,7 @@ class MomMoodCard extends StatelessWidget {
                 color: mood.primaryColor,
               ),
               _MoodInfoChip(
-                label: '외출 목표',
+                label: targetLabel,
                 value: HomeFormatters.formatClockTime(departureTime),
                 color: mood.primaryColor,
               ),

@@ -81,12 +81,19 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _upsertAlarm(AlarmRoutine alarm) async {
+    debugPrint('[HomePage] Upsert alarm: ${alarm.toJson()}');
+
     final nextAlarms = [..._alarms];
     final existingIndex = nextAlarms.indexWhere((item) => item.id == alarm.id);
 
     if (existingIndex == -1) {
       nextAlarms.add(alarm);
-      await _saveAlarms(nextAlarms, snackBarMessage: '새 알람을 저장했어요.');
+      await _saveAlarms(
+        nextAlarms,
+        snackBarMessage: alarm.isClassSchedule
+            ? '"${alarm.title}" 수업 알람을 저장했어요.'
+            : '새 알람을 저장했어요.',
+      );
       return;
     }
 
@@ -98,6 +105,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _deleteAlarm(AlarmRoutine alarm) async {
+    debugPrint('[HomePage] Delete alarm: ${alarm.toJson()}');
+
     final nextAlarms = _alarms
         .where((item) => item.id != alarm.id)
         .toList(growable: false);
@@ -130,6 +139,9 @@ class _HomePageState extends State<HomePage> {
       now: now,
     );
     final hasActiveAlarm = nextOccurrence != null;
+    final targetLabel = nextOccurrence == null
+        ? '외출 목표'
+        : AlarmScheduleCalculator.buildTargetLabel(nextOccurrence.alarm);
     final prepTimeMinutes =
         nextOccurrence?.alarm.prepTimeMinutes ?? fallbackPrepTimeMinutes;
     final bufferMinutes = nextOccurrence?.alarm.bufferMinutes ?? 20;
@@ -164,6 +176,7 @@ class _HomePageState extends State<HomePage> {
             now: now,
             prepTimeMinutes: prepTimeMinutes,
             departureTime: departureTime,
+            targetLabel: targetLabel,
             alarmTime: alarmTime,
             nextAlarmLabel: nextAlarmLabel,
             nextAlarmTitle: nextAlarmTitle,

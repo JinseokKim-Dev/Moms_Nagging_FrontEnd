@@ -1,60 +1,49 @@
+import 'package:flutter/foundation.dart';
+
 import '../alarm/alarm_logic.dart';
 
-class CommuteBreakdown {
-  const CommuteBreakdown({
-    required this.walkMinutes,
-    required this.waitMinutes,
-    required this.busRideMinutes,
-    required this.transferMinutes,
-    required this.arrivalBufferMinutes,
-  });
-
-  final int walkMinutes;
-  final int waitMinutes;
-  final int busRideMinutes;
-  final int transferMinutes;
-  final int arrivalBufferMinutes;
-
-  int get totalMinutes =>
-      walkMinutes +
-      waitMinutes +
-      busRideMinutes +
-      transferMinutes +
-      arrivalBufferMinutes;
-
-  String buildSummary() {
-    return [
-      '도보 $walkMinutes분',
-      '대기 $waitMinutes분',
-      '탑승 $busRideMinutes분',
-      '환승 $transferMinutes분',
-      '도착 여유 $arrivalBufferMinutes분',
-    ].join(' · ');
-  }
-}
-
-class TimetableAlarmDraft {
-  const TimetableAlarmDraft({
-    required this.courseTitle,
-    required this.originLabel,
-    required this.destinationLabel,
+class ClassScheduleEntry {
+  const ClassScheduleEntry({
+    required this.id,
+    required this.className,
     required this.classStartHour,
     required this.classStartMinute,
     required this.weekdays,
-    required this.leaveBufferMinutes,
-    required this.commute,
+    required this.prepTimeMinutes,
     required this.note,
+    required this.enabled,
   });
 
-  final String courseTitle;
-  final String originLabel;
-  final String destinationLabel;
+  final String id;
+  final String className;
   final int classStartHour;
   final int classStartMinute;
   final List<int> weekdays;
-  final int leaveBufferMinutes;
-  final CommuteBreakdown commute;
+  final int prepTimeMinutes;
   final String note;
+  final bool enabled;
+
+  ClassScheduleEntry copyWith({
+    String? id,
+    String? className,
+    int? classStartHour,
+    int? classStartMinute,
+    List<int>? weekdays,
+    int? prepTimeMinutes,
+    String? note,
+    bool? enabled,
+  }) {
+    return ClassScheduleEntry(
+      id: id ?? this.id,
+      className: className ?? this.className,
+      classStartHour: classStartHour ?? this.classStartHour,
+      classStartMinute: classStartMinute ?? this.classStartMinute,
+      weekdays: weekdays ?? this.weekdays,
+      prepTimeMinutes: prepTimeMinutes ?? this.prepTimeMinutes,
+      note: note ?? this.note,
+      enabled: enabled ?? this.enabled,
+    );
+  }
 
   DateTime buildClassStart(DateTime date) {
     return DateTime(
@@ -66,80 +55,157 @@ class TimetableAlarmDraft {
     );
   }
 
-  DateTime buildDepartureTime(DateTime classStart) {
-    return classStart.subtract(Duration(minutes: commute.totalMinutes));
-  }
+  AlarmRoutine toAlarmRoutine() {
+    final normalizedWeekdays = [...weekdays]..sort();
 
-  AlarmRoutine toAlarmRoutine({required int prepTimeMinutes}) {
-    final previewDate = DateTime(2024, 1, 2);
-    final departureTime = buildDepartureTime(buildClassStart(previewDate));
-    final summary = [
-      '$originLabel -> $destinationLabel',
-      commute.buildSummary(),
-      if (note.trim().isNotEmpty) note.trim(),
-    ].join(' · ');
+    debugPrint(
+      '[ClassScheduleEntry] Generate alarm: '
+      'class=$className '
+      'weekdays=$normalizedWeekdays '
+      'start=${classStartHour.toString().padLeft(2, '0')}:${classStartMinute.toString().padLeft(2, '0')} '
+      'prep=$prepTimeMinutes',
+    );
 
     return AlarmRoutine(
-      id: 'schedule_${DateTime.now().microsecondsSinceEpoch}',
-      title: courseTitle.trim().isEmpty ? '첫 수업 자동 알람' : courseTitle.trim(),
-      departureHour: departureTime.hour,
-      departureMinute: departureTime.minute,
+      id: 'schedule_alarm_$id',
+      title: className.trim().isEmpty ? '수업 자동 알람' : className.trim(),
+      departureHour: classStartHour,
+      departureMinute: classStartMinute,
       prepTimeMinutes: prepTimeMinutes,
-      bufferMinutes: leaveBufferMinutes,
-      weekdays: [...weekdays]..sort(),
-      note: summary,
-      enabled: true,
+      bufferMinutes: 0,
+      weekdays: normalizedWeekdays,
+      note: note.trim(),
+      enabled: enabled,
+      source: AlarmRoutineSource.classSchedule,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'className': className,
+      'classStartHour': classStartHour,
+      'classStartMinute': classStartMinute,
+      'weekdays': weekdays,
+      'prepTimeMinutes': prepTimeMinutes,
+      'note': note,
+      'enabled': enabled,
+    };
+  }
+
+  factory ClassScheduleEntry.fromJson(Map<String, dynamic> json) {
+    return ClassScheduleEntry(
+      id: (json['id'] as String?)?.trim().isNotEmpty == true
+          ? (json['id'] as String).trim()
+          : 'schedule_${DateTime.now().microsecondsSinceEpoch}',
+      className: (json['className'] as String?)?.trim().isNotEmpty == true
+          ? (json['className'] as String).trim()
+          : '새 수업',
+      classStartHour: _readInt(
+        json['classStartHour'],
+        fallback: 9,
+      ).clamp(0, 23),
+      classStartMinute: _readInt(
+        json['classStartMinute'],
+        fallback: 0,
+      ).clamp(0, 59),
+      weekdays: _readWeekdays(json['weekdays']),
+      prepTimeMinutes: _readInt(
+        json['prepTimeMinutes'],
+        fallback: 30,
+      ).clamp(1, 180),
+      note: (json['note'] as String? ?? '').trim(),
+      enabled: json['enabled'] is bool ? json['enabled'] as bool : true,
+    );
+  }
+
+  static int _readInt(Object? rawValue, {required int fallback}) {
+    if (rawValue is int) {
+      return rawValue;
+    }
+
+    if (rawValue is num) {
+      return rawValue.toInt();
+    }
+
+    if (rawValue is String) {
+      return int.tryParse(rawValue) ?? fallback;
+    }
+
+    return fallback;
+  }
+
+  static List<int> _readWeekdays(Object? rawValue) {
+    if (rawValue is! List) {
+      return AlarmScheduleCalculator.weekdaySchoolDays;
+    }
+
+    final parsedWeekdays =
+        rawValue
+            .map((item) => _readInt(item, fallback: 0))
+            .where((weekday) => weekday >= 1 && weekday <= 7)
+            .toSet()
+            .toList()
+          ..sort();
+
+    if (parsedWeekdays.isEmpty) {
+      return AlarmScheduleCalculator.weekdaySchoolDays;
+    }
+
+    return parsedWeekdays;
   }
 }
 
-class TimetableAlarmPreview {
-  const TimetableAlarmPreview({
+class ClassSchedulePreview {
+  const ClassSchedulePreview({
     required this.nextClassStart,
-    required this.departureTime,
     required this.alarmTime,
-    required this.departureSlack,
+    required this.timeUntilAlarm,
   });
 
   final DateTime nextClassStart;
-  final DateTime departureTime;
   final DateTime alarmTime;
-  final Duration departureSlack;
+  final Duration timeUntilAlarm;
 }
 
 class ScheduleAlarmPlanner {
   const ScheduleAlarmPlanner._();
 
-  static TimetableAlarmPreview buildPreview({
-    required TimetableAlarmDraft draft,
+  static DateTime buildAlarmTime({
+    required DateTime classStart,
     required int prepTimeMinutes,
+  }) {
+    return classStart.subtract(Duration(minutes: prepTimeMinutes));
+  }
+
+  static ClassSchedulePreview buildPreview({
+    required ClassScheduleEntry entry,
     DateTime? now,
   }) {
     final referenceNow = now ?? DateTime.now();
-    final nextClassStart = _resolveNextClassStart(
+    final nextClassStart = resolveNextClassStart(
       now: referenceNow,
-      hour: draft.classStartHour,
-      minute: draft.classStartMinute,
-      weekdays: draft.weekdays,
+      weekdays: entry.weekdays,
+      hour: entry.classStartHour,
+      minute: entry.classStartMinute,
     );
-    final departureTime = draft.buildDepartureTime(nextClassStart);
-    final alarmTime = departureTime.subtract(
-      Duration(minutes: prepTimeMinutes + draft.leaveBufferMinutes),
+    final alarmTime = buildAlarmTime(
+      classStart: nextClassStart,
+      prepTimeMinutes: entry.prepTimeMinutes,
     );
 
-    return TimetableAlarmPreview(
+    return ClassSchedulePreview(
       nextClassStart: nextClassStart,
-      departureTime: departureTime,
       alarmTime: alarmTime,
-      departureSlack: departureTime.difference(referenceNow),
+      timeUntilAlarm: alarmTime.difference(referenceNow),
     );
   }
 
-  static DateTime _resolveNextClassStart({
+  static DateTime resolveNextClassStart({
     required DateTime now,
+    required List<int> weekdays,
     required int hour,
     required int minute,
-    required List<int> weekdays,
   }) {
     final normalizedWeekdays = weekdays.toSet().toList()..sort();
     final today = DateTime(now.year, now.month, now.day);
@@ -174,9 +240,9 @@ class ScheduleAlarmPlanner {
     );
   }
 
-  static String buildSlackLabel(Duration duration) {
+  static String buildTimeUntilLabel(Duration duration) {
     if (duration.isNegative) {
-      return '${duration.abs().inMinutes}분 늦어요';
+      return '${duration.abs().inMinutes}분 전 시간이에요';
     }
 
     final minutes = duration.inMinutes;
@@ -184,11 +250,14 @@ class ScheduleAlarmPlanner {
     if (minutes >= 60) {
       final hours = minutes ~/ 60;
       final remainingMinutes = minutes % 60;
-      return remainingMinutes == 0
-          ? '$hours시간 여유'
-          : '$hours시간 $remainingMinutes분 여유';
+
+      if (remainingMinutes == 0) {
+        return '$hours시간 뒤 알람';
+      }
+
+      return '$hours시간 $remainingMinutes분 뒤 알람';
     }
 
-    return '$minutes분 여유';
+    return '$minutes분 뒤 알람';
   }
 }

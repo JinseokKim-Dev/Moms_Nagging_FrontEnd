@@ -188,7 +188,7 @@ class AlarmTab extends StatelessWidget {
                   Text(
                     nextOccurrence == null
                         ? '활성화된 알람이 없어요. 새 알람을 만들거나 기존 알람을 켜보세요.'
-                        : '${nextOccurrence!.alarm.title} · ${AlarmScheduleCalculator.buildRepeatLabel(nextOccurrence!.alarm.weekdays)} · 외출 목표 ${HomeFormatters.formatClockTime(nextOccurrence!.departureTime)}',
+                        : '${nextOccurrence!.alarm.title} · ${AlarmScheduleCalculator.buildRepeatLabel(nextOccurrence!.alarm.weekdays)} · ${AlarmScheduleCalculator.buildTargetLabel(nextOccurrence!.alarm)} ${HomeFormatters.formatClockTime(nextOccurrence!.departureTime)}',
                     style: const TextStyle(
                       fontSize: 14,
                       color: Color(0xFFD6E4F0),

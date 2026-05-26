@@ -10,6 +10,7 @@ class HomeTab extends StatelessWidget {
     required this.now,
     required this.prepTimeMinutes,
     required this.departureTime,
+    required this.targetLabel,
     required this.alarmTime,
     required this.nextAlarmLabel,
     required this.nextAlarmTitle,
@@ -26,6 +27,7 @@ class HomeTab extends StatelessWidget {
   final DateTime now;
   final int prepTimeMinutes;
   final DateTime departureTime;
+  final String targetLabel;
   final DateTime alarmTime;
   final String nextAlarmLabel;
   final String nextAlarmTitle;
@@ -244,8 +246,8 @@ class HomeTab extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    '외출 목표',
+                                  Text(
+                                    targetLabel,
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Color(0xFFD6E4F0),
@@ -316,11 +318,12 @@ class HomeTab extends StatelessWidget {
               mood: momMood,
               prepTimeMinutes: prepTimeMinutes,
               departureTime: departureTime,
+              targetLabel: targetLabel,
             ),
             const SizedBox(height: 28),
-            const SectionTitle(
+            SectionTitle(
               title: '오늘의 준비 플랜',
-              subtitle: '설정된 준비 시간과 다음 외출 기준으로 아침 루틴을 정리했어요.',
+              subtitle: '설정된 준비 시간과 다음 $targetLabel 기준으로 아침 루틴을 정리했어요.',
             ),
             const SizedBox(height: 16),
             Row(

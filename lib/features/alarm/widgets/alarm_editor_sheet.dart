@@ -42,6 +42,16 @@ class _AlarmEditorSheetState extends State<AlarmEditorSheet> {
 
   bool get _isEditing => widget.initialAlarm != null;
 
+  String get _targetLabel {
+    final initialAlarm = widget.initialAlarm;
+
+    if (initialAlarm == null) {
+      return '외출 목표';
+    }
+
+    return AlarmScheduleCalculator.buildTargetLabel(initialAlarm);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -73,7 +83,7 @@ class _AlarmEditorSheetState extends State<AlarmEditorSheet> {
     final picked = await showTimePicker(
       context: context,
       initialTime: _departureTime,
-      helpText: '외출 목표 시간',
+      helpText: '$_targetLabel 시간',
     );
 
     if (picked == null) {
@@ -123,6 +133,7 @@ class _AlarmEditorSheetState extends State<AlarmEditorSheet> {
         weekdays: normalizedWeekdays,
         note: _noteController.text.trim(),
         enabled: _enabled,
+        source: widget.initialAlarm?.source ?? AlarmRoutineSource.manual,
       ),
     );
   }
@@ -175,9 +186,9 @@ class _AlarmEditorSheetState extends State<AlarmEditorSheet> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            const Text(
-                              '외출 목표 시간과 준비 루틴을 기준으로 알람을 계산해요.',
-                              style: TextStyle(
+                            Text(
+                              '$_targetLabel 시간과 준비 루틴을 기준으로 알람을 계산해요.',
+                              style: const TextStyle(
                                 fontSize: 14,
                                 color: Color(0xFF64748B),
                               ),
@@ -221,7 +232,7 @@ class _AlarmEditorSheetState extends State<AlarmEditorSheet> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '${HomeFormatters.formatClockTime(departurePreview)} 외출 목표 · ${AlarmScheduleCalculator.formatDuration(_prepTimeMinutes)} 준비 · ${AlarmScheduleCalculator.formatDuration(_bufferMinutes)} 여유${opensPreviousDay ? ' · 전날 알람' : ''}',
+                          '${HomeFormatters.formatClockTime(departurePreview)} $_targetLabel · ${AlarmScheduleCalculator.formatDuration(_prepTimeMinutes)} 준비 · ${AlarmScheduleCalculator.formatDuration(_bufferMinutes)} 여유${opensPreviousDay ? ' · 전날 알람' : ''}',
                           style: const TextStyle(
                             fontSize: 13,
                             color: Color(0xFFD6E4F0),
@@ -269,9 +280,9 @@ class _AlarmEditorSheetState extends State<AlarmEditorSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  '외출 목표 시간',
-                                  style: TextStyle(
+                                Text(
+                                  '$_targetLabel 시간',
+                                  style: const TextStyle(
                                     fontSize: 13,
                                     color: Color(0xFF64748B),
                                   ),

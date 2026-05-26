@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+enum AlarmRoutineSource { manual, classSchedule }
+
 class AlarmRoutine {
   const AlarmRoutine({
     required this.id,
@@ -12,6 +14,7 @@ class AlarmRoutine {
     required this.weekdays,
     required this.note,
     required this.enabled,
+    this.source = AlarmRoutineSource.manual,
   });
 
   final String id;
@@ -23,6 +26,9 @@ class AlarmRoutine {
   final List<int> weekdays;
   final String note;
   final bool enabled;
+  final AlarmRoutineSource source;
+
+  bool get isClassSchedule => source == AlarmRoutineSource.classSchedule;
 
   AlarmRoutine copyWith({
     String? id,
@@ -34,6 +40,7 @@ class AlarmRoutine {
     List<int>? weekdays,
     String? note,
     bool? enabled,
+    AlarmRoutineSource? source,
   }) {
     return AlarmRoutine(
       id: id ?? this.id,
@@ -45,6 +52,7 @@ class AlarmRoutine {
       weekdays: weekdays ?? this.weekdays,
       note: note ?? this.note,
       enabled: enabled ?? this.enabled,
+      source: source ?? this.source,
     );
   }
 
@@ -59,6 +67,7 @@ class AlarmRoutine {
       'weekdays': weekdays,
       'note': note,
       'enabled': enabled,
+      'source': source.name,
     };
   }
 
@@ -83,6 +92,7 @@ class AlarmRoutine {
       weekdays: _readWeekdays(json['weekdays']),
       note: (json['note'] as String? ?? '').trim(),
       enabled: json['enabled'] is bool ? json['enabled'] as bool : true,
+      source: _readSource(json['source']),
     );
   }
 
@@ -120,6 +130,20 @@ class AlarmRoutine {
     }
 
     return parsedWeekdays;
+  }
+
+  static AlarmRoutineSource _readSource(Object? rawValue) {
+    if (rawValue is! String) {
+      return AlarmRoutineSource.manual;
+    }
+
+    switch (rawValue.trim()) {
+      case 'classSchedule':
+        return AlarmRoutineSource.classSchedule;
+      case 'manual':
+      default:
+        return AlarmRoutineSource.manual;
+    }
   }
 }
 
@@ -272,12 +296,21 @@ class AlarmScheduleCalculator {
 
   static String buildConfigurationLabel(AlarmRoutine alarm) {
     final parts = <String>[
+      if (alarm.isClassSchedule) '시간표 자동 생성',
       '${formatDuration(alarm.prepTimeMinutes)} 준비',
       if (alarm.bufferMinutes > 0) '${formatDuration(alarm.bufferMinutes)} 여유',
       if (alarm.note.trim().isNotEmpty) alarm.note.trim(),
     ];
 
     return parts.join(' · ');
+  }
+
+  static String buildTargetLabel(AlarmRoutine alarm) {
+    if (alarm.isClassSchedule) {
+      return '수업 시작';
+    }
+
+    return '외출 목표';
   }
 
   static Color buildAccent(int index) {
